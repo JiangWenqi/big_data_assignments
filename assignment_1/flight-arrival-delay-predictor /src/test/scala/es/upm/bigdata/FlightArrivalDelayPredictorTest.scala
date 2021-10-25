@@ -1,4 +1,4 @@
-package samples
+package es.upm.bigdata
 
 import org.junit._
 import Assert._
