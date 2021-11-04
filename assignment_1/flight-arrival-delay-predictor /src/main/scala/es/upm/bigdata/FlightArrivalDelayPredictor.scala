@@ -1,8 +1,7 @@
 package es.upm.bigdata
 
-import scala.math.random
-
-import org.apache.spark.sql.SparkSession
+import es.upm.bigdata.enums.OnTimeData
+import org.apache.spark.sql.{Dataset, SparkSession}
 
 /**
  * @author Wenqi Jiang,
@@ -13,17 +12,32 @@ object FlightArrivalDelayPredictor {
   def main(args: Array[String]): Unit = {
     val spark = SparkSession
       .builder
-      .appName("Spark Pi")
+      .appName("Flight Arrival Delay Predictor")
       .getOrCreate()
-    val slices = 4
-    val max = 100000 * slices // avoid overflow
-    val numbers = Seq.range(1, max)
-    val count = spark.sparkContext.parallelize(numbers, slices).map { _ =>
-      val x = random * 2 - 1
-      val y = random * 2 - 1
-      if (x * x + y * y <= 1) 1 else 0
-    }.reduce(_ + _)
-    println(s"Pi is roughly ${4.0 * count / (max - 1)}")
+    import spark.implicits._
+
+    val raw_data_path = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/2007.csv"
+    val on_time_data: Dataset[OnTimeData] = spark.read
+      .format("csv")
+      .option("header", "true")
+      .load(raw_data_path)
+      .select(
+        $"ArrTime",
+        $"ActualElapsedTime",
+        $"AirTime",
+        $"TaxiIn",
+        $"Diverted",
+        $"CarrierDelay",
+        $"WeatherDelay",
+        $"NASDelay",
+        $"SecurityDelay",
+        $"LateAircraftDelay",
+        $"ArrDelay"
+      ).flatMap(OnTimeData(_))
+
+
+
+    on_time_data.sample(withReplacement = false, 0.001).show(300,truncate = false)
     spark.stop()
   }
 
