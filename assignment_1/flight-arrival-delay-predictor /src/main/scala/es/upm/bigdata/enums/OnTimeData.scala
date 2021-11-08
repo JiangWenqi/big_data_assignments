@@ -27,9 +27,28 @@ case class OnTimeData(
 }
 
 object OnTimeData {
+  /**
+   * 1. drop (
+   * "ArrTime",
+   * "ActualElapsedTime",
+   * "AirTime",
+   * "TaxiIn",
+   * "Diverted",
+   * "CarrierDelay",
+   * "WeatherDelay",
+   * "NASDelay",
+   * "SecurityDelay",
+   * "LateAircraftDelay"
+   * )
+   *
+   * 2. change some String value to int
+   *
+   * @param row raw data row
+   * @return formatted data
+   */
   def apply(row: Row): OnTimeData = {
     def getIntValue(index: Int): Option[Int] = {
-      if (row.isNullAt(index)||row.getString(index).equals("NA")) None else Option(row.getString(index).toInt)
+      if (row.isNullAt(index) || row.getString(index).equals("NA")) None else Option(row.getString(index).toInt)
     }
 
     def getStringValue(index: Int) = {

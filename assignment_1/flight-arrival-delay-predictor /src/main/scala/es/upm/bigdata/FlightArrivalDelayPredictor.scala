@@ -16,26 +16,15 @@ object FlightArrivalDelayPredictor {
       .getOrCreate()
     import spark.implicits._
 
-    val rawDataPath = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/2007.csv"
-    val onTimeData: Dataset[OnTimeData] = spark.read
+    val rawDataPath = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/*.csv"
+    val rawData = spark.read
       .format("csv")
       .option("header", "true")
       .load(rawDataPath)
-      .drop(
-        "ArrTime",
-        "ActualElapsedTime",
-        "AirTime",
-        "TaxiIn",
-        "Diverted",
-        "CarrierDelay",
-        "WeatherDelay",
-        "NASDelay",
-        "SecurityDelay",
-        "LateAircraftDelay"
-      )
-      .map(OnTimeData(_))
 
-    onTimeData.sample(withReplacement = false, 0.001).show(300,truncate = false)
+    val onTimeData = rawData.map(OnTimeData(_))
+
+    onTimeData.sample(withReplacement = false, 0.00001).show(300, truncate = false)
     spark.stop()
   }
 
