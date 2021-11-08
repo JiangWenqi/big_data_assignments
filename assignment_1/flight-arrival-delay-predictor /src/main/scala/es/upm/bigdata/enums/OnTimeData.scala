@@ -3,61 +3,81 @@ package es.upm.bigdata.enums
 import org.apache.spark.sql.Row
 
 case class OnTimeData(
-                       arrTime: String, //actual arrival time (local, hhmm)
-                       actualElapsedTime: Int, // in minutes
-                       airTime: Int, // in minutes
-                       taxiIn: Int, // taxi in time, in minutes
-                       diverted: Int, // 1 = yes, 0 = no
-                       carrierDelay: Int, // in minutes
-                       weatherDelay: Int, // in minutes
-                       NASDelay: Int, // in minutes
-                       securityDelay: Int, // in minutes
-                       lateAircraftDelay: Int, // in minutes
-                       arrDelay: Int // arrival delay, in minutes
-                     )
+                       year: Option[Int], // 1987-2008
+                       month: Option[Int], // 12-Jan
+                       dayOfMonth: Option[Int], // 31-Jan
+                       dayOfWeek: Option[Int], // 1 (Monday) - 7 (Sunday)
+                       depTime: Option[Int], // actual departure time (local, hhmm)
+                       crsDepTime: Option[Int], // scheduled departure time (local, hhmm)
+                       crsArrTime: Option[Int], // 	scheduled arrival time (local, hhmm)
+                       uniqueCarrier: Option[String], // 	unique carrier code
+                       flightNum: Option[Int], // 	flight number
+                       tailNum: Option[String], // 	plane tail number
+                       crsElapsedTime: Option[Int], // in minutes
+                       arrDelay: Option[Int], // 	arrival delay, in minutes
+                       depDelay: Option[Int], // 	departure delay, in minutes
+                       origin: Option[String], // 	origin IATA airport code
+                       dest: Option[String], // 	destination IATA airport code
+                       distance: Option[Int], // 	in miles/
+                       taxiOut: Option[Int], // 	taxi out time in minutes
+                       cancelled: Option[Int], // 	was the flight cancelled?
+                       cancellationCode: Option[String], // 	reason for cancellation (A = carrier, B = weather, C = NAS, D = security)
+                     ) {
+
+}
 
 object OnTimeData {
-  def apply(row: Row): Option[OnTimeData] = {
-    try {
-      val arrTimeIndex = row.fieldIndex("ArrTime")
-      val arrTime = row.getString(arrTimeIndex)
-
-      val actualElapsedTimeIndex = row.fieldIndex("ActualElapsedTime")
-      val actualElapsedTime = row.getString(actualElapsedTimeIndex).toInt
-
-      val airTimeIndex = row.fieldIndex("AirTime")
-      val airTime = row.getString(airTimeIndex).toInt
-
-      val taxiInIndex = row.fieldIndex("TaxiIn")
-      val taxiIn = row.getString(taxiInIndex).toInt
-
-      val divertedIndex = row.fieldIndex("Diverted")
-      val diverted = row.getString(divertedIndex).toInt
-
-      val carrierDelayIndex = row.fieldIndex("CarrierDelay")
-      val carrierDelay = row.getString(carrierDelayIndex).toInt
-
-      val weatherDelayIndex = row.fieldIndex("WeatherDelay")
-      val weatherDelay = row.getString(weatherDelayIndex).toInt
-
-      val NASDelayIndex = row.fieldIndex("NASDelay")
-      val NASDelay = row.getString(NASDelayIndex).toInt
-
-      val securityDelayIndex = row.fieldIndex("SecurityDelay")
-      val securityDelay = row.getString(securityDelayIndex).toInt
-
-      val lateAircraftDelayIndex = row.fieldIndex("LateAircraftDelay")
-      val lateAircraftDelay = row.getString(lateAircraftDelayIndex).toInt
-
-      val arrDelayIndex = row.fieldIndex("ArrDelay")
-      val arrDelay = row.getString(arrDelayIndex).toInt
-
-      Some(OnTimeData(arrTime, actualElapsedTime, airTime, taxiIn, diverted, carrierDelay, weatherDelay, NASDelay, securityDelay, lateAircraftDelay, arrDelay))
-    } catch {
-      case _: Exception => None
+  def apply(row: Row): OnTimeData = {
+    def getIntValue(index: Int): Option[Int] = {
+      if (row.isNullAt(index)||row.getString(index).equals("NA")) None else Option(row.getString(index).toInt)
     }
 
+    def getStringValue(index: Int) = {
+      if (row.isNullAt(index)) None else Option(row.getString(index))
+    }
 
+    val yearIndex = row.fieldIndex("Year")
+    val monthIndex = row.fieldIndex("Month")
+    val dayOfMonthIndex = row.fieldIndex("DayofMonth")
+    val dayOfWeekIndex = row.fieldIndex("DayOfWeek")
+    val depTimeIndex = row.fieldIndex("DepTime")
+    val crsDepTimeIndex = row.fieldIndex("CRSDepTime")
+    val crsArrTimeIndex = row.fieldIndex("CRSArrTime")
+    val uniqueCarrierIndex = row.fieldIndex("UniqueCarrier")
+    val flightNumIndex = row.fieldIndex("FlightNum")
+    val tailNumIndex = row.fieldIndex("TailNum")
+    val crsElapsedTimeIndex = row.fieldIndex("CRSElapsedTime")
+    val arrDelayIndex = row.fieldIndex("ArrDelay")
+    val depDelayIndex = row.fieldIndex("DepDelay")
+    val originIndex = row.fieldIndex("Origin")
+    val destIndex = row.fieldIndex("Dest")
+    val distanceIndex = row.fieldIndex("Distance")
+    val taxiOutIndex = row.fieldIndex("TaxiOut")
+    val cancelledIndex = row.fieldIndex("Cancelled")
+    val cancellationCodeIndex = row.fieldIndex("CancellationCode")
+
+
+    val year = getIntValue(yearIndex)
+    val month = getIntValue(monthIndex)
+    val dayOfMonth = getIntValue(dayOfMonthIndex)
+    val dayOfWeek = getIntValue(dayOfWeekIndex)
+    val depTime = getIntValue(depTimeIndex)
+    val crsDepTime = getIntValue(crsDepTimeIndex)
+    val crsArrTime = getIntValue(crsArrTimeIndex)
+    val uniqueCarrier = getStringValue(uniqueCarrierIndex)
+    val flightNum = getIntValue(flightNumIndex)
+    val tailNum = getStringValue(tailNumIndex)
+    val crsElapsedTime = getIntValue(crsElapsedTimeIndex)
+    val arrDelay = getIntValue(arrDelayIndex)
+    val depDelay = getIntValue(depDelayIndex)
+    val origin = getStringValue(originIndex)
+    val dest = getStringValue(destIndex)
+    val distance = getIntValue(distanceIndex)
+    val taxiOut = getIntValue(taxiOutIndex)
+    val cancelled = getIntValue(cancelledIndex)
+    val cancellationCode = getStringValue(cancellationCodeIndex)
+
+    OnTimeData(year, month, dayOfMonth, dayOfWeek, depTime, crsDepTime, crsArrTime, uniqueCarrier, flightNum, tailNum, crsElapsedTime, arrDelay, depDelay, origin, dest, distance, taxiOut, cancelled, cancellationCode)
   }
 
 }
