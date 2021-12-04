@@ -5,6 +5,7 @@ import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer, VectorAssembler}
 import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
@@ -26,7 +27,7 @@ object FlightArrivalDelayPredictor {
     val rawData = spark.read.format("csv")
       .option("header", "true")
       .load(RAW_DATA_PATH)
-
+    // clean data
     val cleanedRecords = rawData
       .filter($"Cancelled".eqNullSafe(0)) // filter some flights were cancelled
       .flatMap(CleanedFlightRecord(_))
@@ -56,41 +57,49 @@ object FlightArrivalDelayPredictor {
 
     // categories -> one hot
     val oneHot = new OneHotEncoder()
-      .setInputCols(Array("crsDepTime", "crsArrTime", "distance", "sizeOfOrigin", "uniqueCarrierIndexer"))
-      .setOutputCols(Array("crsDepTimeCode", "crsArrTimeCode", "distanceCode", "sizeOfOriginCode", "uniqueCarrierCode"))
+      .setInputCols(Array("month", "dayOfWeek", "crsDepTime", "crsArrTime", "distance", "sizeOfOrigin", "uniqueCarrierIndexer"))
+      .setOutputCols(Array("monthCode", "dayOfWeekCode", "crsDepTimeCode", "crsArrTimeCode", "distanceCode", "sizeOfOriginCode", "uniqueCarrierCode"))
 
 
     val vector = new VectorAssembler()
-      .setInputCols(Array("month", "dayOfWeek", "depDelay", "taxiOut", "crsDepTimeCode", "crsArrTimeCode", "distanceCode", "sizeOfOriginCode", "uniqueCarrierCode"))
+      .setInputCols(Array("monthCode", "dayOfWeekCode", "depDelay", "taxiOut", "crsDepTimeCode", "crsArrTimeCode", "distanceCode", "sizeOfOriginCode", "uniqueCarrierCode"))
       .setOutputCol("features")
 
     val linear = new LinearRegression()
       .setFeaturesCol("features")
       .setLabelCol("arrDelay")
       .setPredictionCol("prediction")
-      .setMaxIter(10)
-      .setElasticNetParam(0.8)
-
 
     val pipeline = new Pipeline().setStages(Array(indexer, oneHot, vector, linear))
 
-    val linearModel = pipeline.fit(training)
-
-    val predictions = linearModel.transform(test)
-
-    predictions.select($"arrDelay", $"prediction")
-      .sample(withReplacement = false, 0.0001)
-      .show(300, truncate = false)
-
+    val paramGrid = new ParamGridBuilder()
+      .addGrid(linear.maxIter, Array(10, 50, 100))
+      .addGrid(linear.regParam, Array(0.3, 0.1, 0.01))
+      .build()
 
     val evaluator = new RegressionEvaluator()
       .setLabelCol("arrDelay")
       .setPredictionCol("prediction")
-      .setMetricName("rmse")
+      .setMetricName("r2")
 
-    val rmse = evaluator.evaluate(predictions)
-    println(s"Root Mean Squared Error (RMSE) on test data = $rmse")
+    val trainValidationSplit = new TrainValidationSplit()
+      .setEstimator(pipeline)
+      .setEstimatorParamMaps(paramGrid)
+      .setEvaluator(evaluator)
+      // 80% of the data will be used for training and the remaining 20% for validation.
+      .setTrainRatio(0.8)
+      // Evaluate up to 2 parameter settings in parallel
+      .setParallelism(2)
 
+    val linearModel = trainValidationSplit.fit(training).bestModel
+    val prediction = linearModel.transform(test)
+
+    val testEvaluator = new RegressionEvaluator()
+      .setLabelCol("arrDelay")
+      .setPredictionCol("prediction")
+      .setMetricName("r2")
+    val r2 = testEvaluator.evaluate(prediction)
+    printf(s"R2:$r2")
     cleanedRecords.unpersist()
     spark.stop()
   }
