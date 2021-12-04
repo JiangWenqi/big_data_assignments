@@ -18,11 +18,17 @@ object FlightArrivalDelayPredictor {
 
   def main(args: Array[String]): Unit = {
     val spark = SparkSession.builder
-      .config("spark.driver.memory", "12g")
-//      .config("spark.executor.memory", "2g")
-      .master("local[8]")
+      .master("local[6]")
       .appName("Flight Arrival Delay Predictor")
+      .config("spark.driver.memory", "14g")
+      //      .config("spark.executor.memory", "2g")
+      .config("spark.dynamicAllocation.maxExecutors", 10)
+      .config("spark.debug.maxToStringFields", 512)
+      .config("spark.sql.debug.maxToStringFields", 1024)
       .getOrCreate()
+
+    // show less log
+    spark.sparkContext.setLogLevel("WARN")
 
     import spark.implicits._
 
@@ -49,7 +55,8 @@ object FlightArrivalDelayPredictor {
             .when($"countOfOrigin".between(25000, 49999), 2)
             .when($"countOfOrigin".lt(25000), 3)
             .otherwise(-1)
-        ),
+        )
+        .where($"sizeOfOrigin".notEqual(-1)),
       Seq("origin"),
       "inner"
     )
@@ -142,7 +149,7 @@ object FlightArrivalDelayPredictor {
     val linearValidation = new TrainValidationSplit()
       .setEstimator(linearPipeline)
       .setEstimatorParamMaps(linearParamGrid)
-      .setEvaluator(rmseEvaluator)
+      .setEvaluator(r2Evaluator)
       .setTrainRatio(0.8)
       .setParallelism(4)
 
@@ -176,13 +183,15 @@ object FlightArrivalDelayPredictor {
 
     // --------------------------- chose best model----------------------------------------------------
     val linearPrediction = linearModel.transform(modelTest)
-    val generalizedLinearPrediction = generalizedLinearModel.transform(modelTest)
+
 
     val linearR2 = r2Evaluator.evaluate(linearPrediction)
     val linearRMSE = rmseEvaluator.evaluate(linearPrediction)
     println("--------------------- linear model Metric ------------------- ")
     println(s"--------------------- R2: $linearR2 ------------------- ")
     println(s"--------------------- RMSE: $linearRMSE ------------------- ")
+
+    val generalizedLinearPrediction = generalizedLinearModel.transform(modelTest)
     val generalizedLinearR2 = r2Evaluator.evaluate(generalizedLinearPrediction)
     val generalizedLinearRMSE = rmseEvaluator.evaluate(generalizedLinearPrediction)
     println("--------------------- generalized Linear model Metric ------------------- ")
