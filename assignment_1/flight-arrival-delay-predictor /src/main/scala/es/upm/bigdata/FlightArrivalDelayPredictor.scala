@@ -183,8 +183,6 @@ object FlightArrivalDelayPredictor {
 
     // --------------------------- chose best model----------------------------------------------------
     val linearPrediction = linearModel.transform(modelTest)
-
-
     val linearR2 = r2Evaluator.evaluate(linearPrediction)
     val linearRMSE = rmseEvaluator.evaluate(linearPrediction)
     println("--------------------- linear model Metric ------------------- ")
@@ -198,6 +196,15 @@ object FlightArrivalDelayPredictor {
     println(s"--------------------- R2: $generalizedLinearR2 ------------------- ")
     println(s"--------------------- RMSE: $generalizedLinearRMSE ------------------- ")
 
+    // --------------------------------------------------------------------------------
+    val bestModel = if (linearR2 > generalizedLinearR2) linearModel else generalizedLinearModel
+
+    val bestPrediction =  bestModel.transform(test)
+    val bestR2 = r2Evaluator.evaluate(bestPrediction)
+    val bestRMSE = rmseEvaluator.evaluate(bestPrediction)
+    println("--------------------- best Linear model Metric ------------------- ")
+    println(s"--------------------- R2: $bestR2 ------------------- ")
+    println(s"--------------------- RMSE: $bestRMSE ------------------- ")
 
     formattedRecords.unpersist()
     spark.stop()
