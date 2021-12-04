@@ -4,20 +4,23 @@ import es.upm.bigdata.enums.CleanedFlightRecord
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer, VectorAssembler}
-import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.regression.{GeneralizedLinearRegression, LinearRegression}
 import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+
 
 /**
  * @author Wenqi Jiang,
  */
 object FlightArrivalDelayPredictor {
-  val RAW_DATA_PATH = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/*.csv"
+  val RAW_DATA_PATH = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/2000.csv"
 
   def main(args: Array[String]): Unit = {
-    val spark = SparkSession
-      .builder
+    val spark = SparkSession.builder
+      .config("spark.driver.memory", "12g")
+//      .config("spark.executor.memory", "2g")
+      .master("local[8]")
       .appName("Flight Arrival Delay Predictor")
       .getOrCreate()
 
@@ -27,11 +30,13 @@ object FlightArrivalDelayPredictor {
     val rawData = spark.read.format("csv")
       .option("header", "true")
       .load(RAW_DATA_PATH)
+
+
     // clean data
     val cleanedRecords = rawData
       .filter($"Cancelled".eqNullSafe(0)) // filter some flights were cancelled
       .flatMap(CleanedFlightRecord(_))
-      .cache()
+
 
     val formattedRecords = cleanedRecords.join(
       // bins / Discretization 0. >150,000, 1. 50,000-150,000, 2. 25,000-49,999, 3. <25,000
@@ -48,59 +53,144 @@ object FlightArrivalDelayPredictor {
       Seq("origin"),
       "inner"
     )
+      .cache()
 
     // training and test data
-    val Array(training, test) = formattedRecords.randomSplit(Array(0.8, 0.2))
+    val Array(training, modelTest, test) = formattedRecords.randomSplit(Array(0.7, 0.15, 0.15))
 
     // string indexer for unique_carrier
-    val indexer = new StringIndexer().setInputCol("uniqueCarrier").setOutputCol("uniqueCarrierIndexer")
+    val indexer = new StringIndexer()
+      .setInputCols(Array(
+        "month",
+        "dayOfWeek",
+        "uniqueCarrier",
+        "crsDepTime",
+        "crsArrTime",
+        "distance",
+        "sizeOfOrigin")
+      )
+      .setOutputCols(Array(
+        "monthIndexer",
+        "dayOfWeekIndexer",
+        "uniqueCarrierIndexer",
+        "crsDepTimeIndexer",
+        "crsArrTimeIndexer",
+        "distanceIndexer",
+        "sizeOfOriginIndexer"
+      ))
 
     // categories -> one hot
     val oneHot = new OneHotEncoder()
-      .setInputCols(Array("month", "dayOfWeek", "crsDepTime", "crsArrTime", "distance", "sizeOfOrigin", "uniqueCarrierIndexer"))
-      .setOutputCols(Array("monthCode", "dayOfWeekCode", "crsDepTimeCode", "crsArrTimeCode", "distanceCode", "sizeOfOriginCode", "uniqueCarrierCode"))
+      .setInputCols(Array(
+        "monthIndexer",
+        "dayOfWeekIndexer",
+        "uniqueCarrierIndexer",
+        "crsDepTimeIndexer",
+        "crsArrTimeIndexer",
+        "distanceIndexer",
+        "sizeOfOriginIndexer"
+      ))
+      .setOutputCols(Array(
+        "monthCode",
+        "dayOfWeekCode",
+        "uniqueCarrierCode",
+        "crsDepTimeCode",
+        "crsArrTimeCode",
+        "distanceCode",
+        "sizeOfOriginCode"
+      ))
 
 
     val vector = new VectorAssembler()
-      .setInputCols(Array("monthCode", "dayOfWeekCode", "depDelay", "taxiOut", "crsDepTimeCode", "crsArrTimeCode", "distanceCode", "sizeOfOriginCode", "uniqueCarrierCode"))
+      .setInputCols(
+        Array(
+          "depDelay",
+          "taxiOut",
+          "monthCode",
+          "dayOfWeekCode",
+          "uniqueCarrierCode",
+          "crsDepTimeCode",
+          "crsArrTimeCode",
+          "distanceCode",
+          "sizeOfOriginCode"
+        )
+      )
       .setOutputCol("features")
 
+    val rmseEvaluator = new RegressionEvaluator()
+      .setLabelCol("arrDelay")
+      .setPredictionCol("prediction")
+      .setMetricName("rmse")
+
+    val r2Evaluator = new RegressionEvaluator()
+      .setLabelCol("arrDelay")
+      .setPredictionCol("prediction")
+      .setMetricName("r2")
+    // ------------------------ linear regression -----------------------
     val linear = new LinearRegression()
       .setFeaturesCol("features")
       .setLabelCol("arrDelay")
       .setPredictionCol("prediction")
 
-    val pipeline = new Pipeline().setStages(Array(indexer, oneHot, vector, linear))
-
-    val paramGrid = new ParamGridBuilder()
-      .addGrid(linear.maxIter, Array(10, 50, 100))
-      .addGrid(linear.regParam, Array(0.3, 0.1, 0.01))
+    val linearParamGrid = new ParamGridBuilder()
+      .addGrid(linear.maxIter, Array(25, 100))
+      .addGrid(linear.regParam, Array(0.1, 0.01, 0.001))
       .build()
 
-    val evaluator = new RegressionEvaluator()
-      .setLabelCol("arrDelay")
-      .setPredictionCol("prediction")
-      .setMetricName("r2")
+    val linearPipeline = new Pipeline().setStages(Array(indexer, oneHot, vector, linear))
 
-    val trainValidationSplit = new TrainValidationSplit()
-      .setEstimator(pipeline)
-      .setEstimatorParamMaps(paramGrid)
-      .setEvaluator(evaluator)
-      // 80% of the data will be used for training and the remaining 20% for validation.
+    val linearValidation = new TrainValidationSplit()
+      .setEstimator(linearPipeline)
+      .setEstimatorParamMaps(linearParamGrid)
+      .setEvaluator(rmseEvaluator)
       .setTrainRatio(0.8)
-      // Evaluate up to 2 parameter settings in parallel
-      .setParallelism(2)
+      .setParallelism(4)
 
-    val linearModel = trainValidationSplit.fit(training).bestModel
-    val prediction = linearModel.transform(test)
+    val linearModel = linearValidation.fit(training).bestModel
 
-    val testEvaluator = new RegressionEvaluator()
+    // ----------------- GeneralizedLinearRegression ----------------------------------
+
+    val generalizedLinear = new GeneralizedLinearRegression()
+      .setFamily("gaussian")
+      .setLink("identity")
+      .setFeaturesCol("features")
       .setLabelCol("arrDelay")
       .setPredictionCol("prediction")
-      .setMetricName("r2")
-    val r2 = testEvaluator.evaluate(prediction)
-    printf(s"R2:$r2")
-    cleanedRecords.unpersist()
+
+    val generalizedLinearParamGrid = new ParamGridBuilder()
+      .addGrid(generalizedLinear.maxIter, Array(25, 100))
+      .addGrid(generalizedLinear.regParam, Array(0.1, 0.01, 0.001))
+      .build()
+
+    val generalizedLinearPipeline = new Pipeline()
+      .setStages(Array(indexer, oneHot, vector, generalizedLinear))
+
+    val generalizedLinearValidation = new TrainValidationSplit()
+      .setEstimator(generalizedLinearPipeline)
+      .setEstimatorParamMaps(generalizedLinearParamGrid)
+      .setEvaluator(rmseEvaluator)
+      .setTrainRatio(0.8)
+      .setParallelism(4)
+
+    val generalizedLinearModel = generalizedLinearValidation.fit(training).bestModel
+
+    // --------------------------- chose best model----------------------------------------------------
+    val linearPrediction = linearModel.transform(modelTest)
+    val generalizedLinearPrediction = generalizedLinearModel.transform(modelTest)
+
+    val linearR2 = r2Evaluator.evaluate(linearPrediction)
+    val linearRMSE = rmseEvaluator.evaluate(linearPrediction)
+    println("--------------------- linear model Metric ------------------- ")
+    println(s"--------------------- R2: $linearR2 ------------------- ")
+    println(s"--------------------- RMSE: $linearRMSE ------------------- ")
+    val generalizedLinearR2 = r2Evaluator.evaluate(generalizedLinearPrediction)
+    val generalizedLinearRMSE = rmseEvaluator.evaluate(generalizedLinearPrediction)
+    println("--------------------- generalized Linear model Metric ------------------- ")
+    println(s"--------------------- R2: $generalizedLinearR2 ------------------- ")
+    println(s"--------------------- RMSE: $generalizedLinearRMSE ------------------- ")
+
+
+    formattedRecords.unpersist()
     spark.stop()
   }
 
