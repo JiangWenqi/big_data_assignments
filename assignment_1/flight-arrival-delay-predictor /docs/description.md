@@ -4,11 +4,11 @@
 
 The basic problem of this exercise is to create a model capable of predicting the arrival delay time of a commercial flight, given a set of parameters known at time of take-off. To do that, students will use publicly available data from commercial USA domestic flights. The main result of this work will be a Spark application, programmed to perform the following tasks:
 
-- [ ] Load the input data, previously stored at a known location.
-- [ ] Select, process and transform the input variables, to prepare them for training the model.
-- [ ] Perform some basic analysis of each input variable.
-- [ ] Create a machine learning model that predicts the arrival delay time.
-- [ ] Validate the created model and provide some measure of its accuracy.
+- [x] Load the input data, previously stored at a known location.
+- [x] Select, process and transform the input variables, to prepare them for training the model.
+- [x] Perform some basic analysis of each input variable.
+- [x] Create a machine learning model that predicts the arrival delay time.
+- [x] Validate the created model and provide some measure of its accuracy.
 
 # The Data
 For this exercise, students will use data published by the US Department of Transportation. This data can be downloaded from the following [URL](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/HG7NV7)
@@ -112,14 +112,14 @@ The work will be graded from 0 to 10 points. A minimum of 5 points is required t
 
 ## Basics
 To obtain the minimum 5 points for passing, students must at least perform the following tasks:
-- [ ] Read the input data file, correctly separating all given variables.
-- [ ] Perform variable selection based on some basic analysis and logical criteria.
-- [ ] Properly handle variable types (numerical, categorical, etc.).
-- [ ] Select at least one appropriate machine learning algorithm for the problem and correctly train the model using basic train/test data split.
-- [ ] Use an appropriate validation metric to measure the model performance.
-- [ ] Use basic MLlib tools for handling the data, training and validating the model.
-- [ ] Present code that works without human intervention/alteration, aside from running the program.
-- [ ] Write a clear and concise report, detailing all the reasoning process and decisions made.
+- [x] Read the input data file, correctly separating all given variables.
+- [x] Perform variable selection based on some basic analysis and logical criteria.
+- [x] Properly handle variable types (numerical, categorical, etc.).
+- [x] Select at least one appropriate machine learning algorithm for the problem and correctly train the model using basic train/test data split.
+- [x] Use an appropriate validation metric to measure the model performance.
+- [x] Use basic MLlib tools for handling the data, training and validating the model.
+- [x] Present code that works without human intervention/alteration, aside from running the program.
+- [x] Write a clear and concise report, detailing all the reasoning process and decisions made.
 
 ## Going further
 Once the basics are covered, there are many things that can be done to raise the assignment grade, depending on the approach the students follow. One of the purposes of the assignment is to allow students to explore the Spark library and experiment with as many of the provided tools as possible. Here is a list of possible things that can be done to improve the quality of the work and obtain a very good or excellent grade. These aspects are not presented in any particular order (priority, importance, weight, etc.). Students should try to cover as many of them as possible if they intend to obtain a high grade. This is not an exhaustive list; new additions and other interesting improvements are welcome.
