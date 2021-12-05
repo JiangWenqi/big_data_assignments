@@ -9,31 +9,42 @@ import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
+import java.nio.file.{Files, Paths}
 
 /**
  * @author Wenqi Jiang,
  */
 object FlightArrivalDelayPredictor {
-  val RAW_DATA_PATH = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/2000.csv"
+  private var RAW_DATA_PATH = "file:///Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/2000.csv"
+
+  val SPARK_SESSION: SparkSession = SparkSession.builder
+    .master("local[6]")
+    .appName("Flight Arrival Delay Predictor")
+    .config("spark.driver.memory", "14g")
+    //      .config("spark.executor.memory", "2g")
+    .config("spark.dynamicAllocation.maxExecutors", 10)
+    .config("spark.debug.maxToStringFields", 512)
+    .config("spark.sql.debug.maxToStringFields", 1024)
+    .getOrCreate()
+
+  // show less log
+  SPARK_SESSION.sparkContext.setLogLevel("WARN")
+
 
   def main(args: Array[String]): Unit = {
-    val spark = SparkSession.builder
-      .master("local[6]")
-      .appName("Flight Arrival Delay Predictor")
-      .config("spark.driver.memory", "14g")
-      //      .config("spark.executor.memory", "2g")
-      .config("spark.dynamicAllocation.maxExecutors", 10)
-      .config("spark.debug.maxToStringFields", 512)
-      .config("spark.sql.debug.maxToStringFields", 1024)
-      .getOrCreate()
 
-    // show less log
-    spark.sparkContext.setLogLevel("WARN")
+    import SPARK_SESSION.implicits._
 
-    import spark.implicits._
+    if (args.length >= 1) {
+      println(args(0))
+      if (Files.exists(Paths.get(args(0)))) {
+        RAW_DATA_PATH = "file://" + args(0)
+      } else throw new NullPointerException("The file path is incorrect")
+
+    }
 
     // load raw data
-    val rawData = spark.read.format("csv")
+    val rawData = SPARK_SESSION.read.format("csv")
       .option("header", "true")
       .load(RAW_DATA_PATH)
 
@@ -199,7 +210,7 @@ object FlightArrivalDelayPredictor {
     // --------------------------------------------------------------------------------
     val bestModel = if (linearR2 > generalizedLinearR2) linearModel else generalizedLinearModel
 
-    val bestPrediction =  bestModel.transform(test)
+    val bestPrediction = bestModel.transform(test)
     val bestR2 = r2Evaluator.evaluate(bestPrediction)
     val bestRMSE = rmseEvaluator.evaluate(bestPrediction)
     println("--------------------- best Linear model Metric ------------------- ")
@@ -207,7 +218,7 @@ object FlightArrivalDelayPredictor {
     println(s"--------------------- RMSE: $bestRMSE ------------------- ")
 
     formattedRecords.unpersist()
-    spark.stop()
+    SPARK_SESSION.stop()
   }
 
 }

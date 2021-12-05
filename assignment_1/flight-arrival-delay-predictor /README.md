@@ -8,4 +8,6 @@
 3. run maven package: 
    `mvn clean package`
 4. run jar: 
-   `spark-submit target/flight-arrival-delay-predictor-1.0-SNAPSHOT-jar-with-dependencies.jar`
+   `spark-submit target/flight-arrival-delay-predictor-1.0-SNAPSHOT-jar-with-dependencies.jar absolute_path`
+   like:
+   `spark-submit  target/flight-arrival-delay-predictor-1.0-SNAPSHOT-jar-with-dependencies.jar /Users/vinci/BooksAndResources/DataScience/BigData/big_data_assignment_1/2000.csv`
